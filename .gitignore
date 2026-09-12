@@ -1,0 +1,6 @@
+build/
+build-*/
+url_shortener.db
+*.db-shm
+*.db-wal
+compile_commands.json
