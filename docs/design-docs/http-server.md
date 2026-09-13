@@ -33,10 +33,17 @@ The serializer emits a status line, bounded application headers,
 `Content-Length`, `Connection: close`, a blank line, and the body. Header values
 must not contain CR, LF, or other control characters.
 
+The browser page uses the same `http_response_t` and serializer as every other
+response. Its `text/html; charset=utf-8` body must fit within the existing
+`HTTP_MAX_BODY_BYTES` value of 4096 bytes. No HTTP public type, function, or
+capacity changes for this increment.
+
 ## Server responsibility
 
 Own the TCP lifecycle for a fixed `127.0.0.1:8080` listener. Each accepted
-connection receives one request and is then closed.
+connection receives one request and is then closed. Server passes parsed requests
+to Router and writes the returned response; it does not distinguish the browser
+page from other routes and does not open runtime web files.
 
 ## Server public interface
 
@@ -53,6 +60,7 @@ sockets.
 
 - Maximum header section: 8 KiB
 - Maximum body: 4 KiB
+- Maximum response body, including the embedded HTML page: 4 KiB
 - Every client request has a two-second total deadline measured with a monotonic
   clock; receiving a slow byte does not reset it
 - Reads continue until one complete request, a limit violation, EOF, or error
@@ -64,4 +72,7 @@ sockets.
 
 HTTP unit tests cover partial input, limits, framing, header casing,
 Content-Length errors, transfer encoding, JSON escapes/errors, serialization, and
-CR/LF rejection. Server behavior is verified through localhost acceptance tests.
+CR/LF rejection. Existing HTTP and Server tests remain valid because their public
+interfaces do not change. Server behavior, including delivery of the embedded
+page without a runtime asset path, is verified through localhost acceptance
+tests.

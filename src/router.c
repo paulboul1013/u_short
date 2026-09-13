@@ -1,5 +1,7 @@
 #include "router.h"
 
+#include "embedded_web_asset.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -61,6 +63,14 @@ static void handle_method_not_allowed(http_response_t *response,
                                       const char *allow) {
     set_error(response, 405);
     if (!http_response_set_allow(response, allow)) {
+        set_error(response, 500);
+    }
+}
+
+static void handle_root(http_response_t *response) {
+    if (!http_response_init(response, 200, "text/html; charset=utf-8",
+                            (const char *)embedded_web_index_html,
+                            embedded_web_index_html_length)) {
         set_error(response, 500);
     }
 }
@@ -149,6 +159,14 @@ void router_handle(const http_request_t *request, shortener_t *shortener,
     }
     path_length = route_path_length(request->target);
 
+    if (path_equals(request->target, path_length, "/")) {
+        if (request->method != HTTP_METHOD_GET) {
+            handle_method_not_allowed(response, "GET");
+        } else {
+            handle_root(response);
+        }
+        return;
+    }
     if (path_equals(request->target, path_length, "/health")) {
         if (request->method != HTTP_METHOD_GET) {
             handle_method_not_allowed(response, "GET");

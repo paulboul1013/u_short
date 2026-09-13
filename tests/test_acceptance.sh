@@ -93,6 +93,44 @@ grep -qi '^Content-Type: text/plain$' "$test_dir/health.clean"
 grep -qi '^Content-Length: 2$' "$test_dir/health.clean"
 grep -qi '^Connection: close$' "$test_dir/health.clean"
 
+root_status=$("$curl_binary" --silent --show-error --max-time 2 \
+    --dump-header "$test_dir/root.headers" \
+    --output "$test_dir/root.body" --write-out '%{http_code}' \
+    http://127.0.0.1:8080/)
+[ "$root_status" = "200" ] || {
+    echo "unexpected root status: $root_status" >&2
+    exit 1
+}
+tr -d '\r' <"$test_dir/root.headers" >"$test_dir/root.clean"
+root_bytes=$(wc -c <"$test_dir/root.body" | tr -d ' ')
+grep -qi '^Content-Type: text/html; charset=utf-8$' "$test_dir/root.clean"
+grep -qi "^Content-Length: $root_bytes$" "$test_dir/root.clean"
+grep -qi '^Connection: close$' "$test_dir/root.clean"
+grep -q '<form id="shorten-form"' "$test_dir/root.body"
+grep -q '<label for="original-url">Original URL</label>' "$test_dir/root.body"
+grep -q 'aria-live="polite"' "$test_dir/root.body"
+grep -q "fetch('/shorten'" "$test_dir/root.body"
+
+root_query_status=$("$curl_binary" --silent --show-error --max-time 2 \
+    --output "$test_dir/root-query.body" --write-out '%{http_code}' \
+    'http://127.0.0.1:8080/?source=acceptance')
+[ "$root_query_status" = "200" ] || {
+    echo "unexpected root query status: $root_query_status" >&2
+    exit 1
+}
+cmp "$test_dir/root.body" "$test_dir/root-query.body"
+
+root_post_status=$("$curl_binary" --silent --show-error --max-time 2 \
+    --request POST --dump-header "$test_dir/root-post.headers" \
+    --output "$test_dir/root-post.body" --write-out '%{http_code}' \
+    http://127.0.0.1:8080/)
+[ "$root_post_status" = "405" ] || {
+    echo "unexpected root POST status: $root_post_status" >&2
+    exit 1
+}
+tr -d '\r' <"$test_dir/root-post.headers" >"$test_dir/root-post.clean"
+grep -qi '^Allow: GET$' "$test_dir/root-post.clean"
+
 create_status=$("$curl_binary" --silent --show-error --max-time 2 \
     -H 'Content-Type: application/json' \
     --data '{"url":"https://example.com/persisted"}' \

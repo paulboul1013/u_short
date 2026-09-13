@@ -36,8 +36,10 @@ not cache a file tree in this document.
 - URL Shortener v1 is complete and verified.
 - Its historical execution plan is
   `docs/exec-plans/completed/url-shortener-v1.md`.
+- The Simple HTML web UI increment is complete and verified. Its specification
+  is `docs/product-specs/simple-html-ui.md`, and its execution record is
+  `docs/exec-plans/completed/simple-html-ui.md`.
 - `docs/exec-plans/active/` currently contains no active implementation plan.
-- A web UI has not yet been specified or added to the source tree.
 
 ## Root agent responsibilities
 

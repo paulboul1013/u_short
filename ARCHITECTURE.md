@@ -9,13 +9,12 @@ Browser
 server.c -- parses/serializes through --> http.c
    |
    v
-router.c
+router.c ---- serves embedded UI asset
    |
-   v
-shortener.c
-   |       \
-   v        v
-database.c  base62.c
+   `--------> shortener.c
+               |       \
+               v        v
+            database.c  base62.c
 ```
 
 `main.c` is the composition root: it opens the database, initializes the
@@ -35,7 +34,8 @@ server
 
 router
   +--> http
-  `--> shortener
+  +--> shortener
+  `--> embedded web asset
 
 shortener
   +--> database
@@ -45,12 +45,18 @@ shortener
 Dependencies must not point upward. In particular, `database` and `base62` know
 nothing about HTTP, and `http` knows nothing about routing or persistence.
 
+`web/index.html` is a build-time input that is embedded in the application
+binary. It is not a runtime filesystem dependency. The generated representation
+is an implementation detail consumed by Router and must preserve the existing
+HTTP response body bound.
+
 ## Module ownership
 
 ### Server
 
 Owns socket creation, bind/listen/accept, bounded reads, writes, signal-aware
-shutdown, and one-request-per-connection lifecycle.
+shutdown, and one-request-per-connection lifecycle. It does not select routes or
+load web assets. Its public interface is unchanged by the browser UI increment.
 
 ### HTTP
 
@@ -60,7 +66,17 @@ decoder, and response serialization. It does not choose routes or status codes.
 ### Router
 
 Owns method-and-path matching, route priority, handler selection, and translating
-module results into HTTP responses.
+module results into HTTP responses. It also owns the exact `GET /` application
+route and returns the build-time embedded browser page. Query strings do not
+participate in route matching, and exact application routes take priority over
+the parameterized `/{code}` redirect route.
+
+### Browser UI
+
+Owns presentation state, same-origin calls to `POST /shorten`, and clipboard
+interaction. It is a thin adapter and does not own authoritative URL validation,
+Short Code generation, persistence, or routing. Its complete source is the
+dependency-free `web/index.html` asset.
 
 ### Shortener
 
@@ -87,3 +103,5 @@ Owns canonical conversion between `uint64_t` and the persistent Base62 alphabet.
 - The database handle is opaque. Returned URL text is copied into caller-owned
   bounded storage.
 - Tests exercise the same public interfaces as production callers.
+- The embedded HTML response must fit within `HTTP_MAX_BODY_BYTES` (4096 bytes);
+  `http_response_t` and the Server public interface remain unchanged.

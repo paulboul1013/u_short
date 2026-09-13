@@ -12,6 +12,11 @@ ctest --test-dir build --output-on-failure
 
 No test may be skipped or disabled.
 
+The dependency-free `web/index.html` source asset must be embedded at build time.
+The build must fail clearly if its response body would exceed
+`HTTP_MAX_BODY_BYTES` (4096 bytes). Running the resulting binary must not require
+the source asset or any other web asset at a runtime filesystem path.
+
 Building the application requires SQLite3 development files. With
 `BUILD_TESTING=ON`, CMake also requires `curl` and a Python 3 interpreter for the
 localhost socket acceptance test; POSIX `sed`, `tr`, and `grep` are used by the
@@ -58,10 +63,31 @@ still work.
 
 ## Routing
 
-- Unsupported methods on `/health`, `/shorten`, or `/{code}` return HTTP 405
+- `GET /` and `GET /?query` return HTTP 200,
+  `Content-Type: text/html; charset=utf-8`, and the complete embedded browser
+  page.
+- The exact `/` route is selected before `/{code}`; an empty Short Code is not
+  resolved.
+- Unsupported methods on `/`, `/health`, `/shorten`, or `/{code}` return HTTP 405
   with the correct `Allow` header.
 - Unknown paths return HTTP 404.
 - Query strings do not participate in route matching.
+
+## Browser UI
+
+- The page sends a same-origin `POST /shorten` request using JSON and displays
+  `short_url` from a valid HTTP 201 response.
+- A user can submit, copy, and open the result using only the keyboard.
+- The entered Original URL remains available after a failed submission.
+- Empty or invalid input, HTTP 400, HTTP 500, a network failure, and a malformed
+  success payload show understandable text and permit retry.
+- Clipboard failure leaves the Short URL visible and selectable.
+- Returned values containing markup-like text are displayed as text and are not
+  executed.
+- At a 375-pixel viewport the page has no horizontal scrolling, and visible focus
+  and status indicators remain available without relying on color alone.
+- The page contains no external runtime resource or third-party frontend
+  dependency.
 
 ## HTTP framing and safety
 

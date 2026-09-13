@@ -8,7 +8,45 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 find_package(SQLite3 REQUIRED)
 
+set(WEB_ASSET_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/web/index.html")
+set(WEB_ASSET_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(WEB_ASSET_HEADER
+    "${WEB_ASSET_GENERATED_DIR}/embedded_web_asset.h"
+)
+
+set(HTTP_PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/include/http.h")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${HTTP_PUBLIC_HEADER}"
+)
+file(STRINGS "${HTTP_PUBLIC_HEADER}" HTTP_MAX_BODY_DEFINITION
+    REGEX "^#define[ \t]+HTTP_MAX_BODY_BYTES[ \t]+[0-9]+U?$"
+    LIMIT_COUNT 1
+)
+if(NOT HTTP_MAX_BODY_DEFINITION MATCHES
+   "^#define[ \t]+HTTP_MAX_BODY_BYTES[ \t]+([0-9]+)U?$")
+    message(FATAL_ERROR
+        "Could not determine HTTP_MAX_BODY_BYTES from ${HTTP_PUBLIC_HEADER}"
+    )
+endif()
+set(WEB_ASSET_MAX_BYTES "${CMAKE_MATCH_1}")
+
+add_custom_command(
+    OUTPUT "${WEB_ASSET_HEADER}"
+    COMMAND "${CMAKE_COMMAND}"
+            "-DINPUT_FILE=${WEB_ASSET_SOURCE}"
+            "-DOUTPUT_FILE=${WEB_ASSET_HEADER}"
+            "-DMAX_BYTES=${WEB_ASSET_MAX_BYTES}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_web_asset.cmake"
+    DEPENDS
+        "${WEB_ASSET_SOURCE}"
+        "${HTTP_PUBLIC_HEADER}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_web_asset.cmake"
+    COMMENT "Embedding web/index.html (${WEB_ASSET_MAX_BYTES}-byte limit)"
+    VERBATIM
+)
+
 add_library(url_shortener_core STATIC
+    "${WEB_ASSET_HEADER}"
     src/base62.c
     src/database.c
     src/http.c
@@ -17,6 +55,9 @@ add_library(url_shortener_core STATIC
     src/shortener.c
 )
 target_include_directories(url_shortener_core PUBLIC include)
+target_include_directories(url_shortener_core PRIVATE
+    "${WEB_ASSET_GENERATED_DIR}"
+)
 target_link_libraries(url_shortener_core PUBLIC SQLite::SQLite3)
 
 add_executable(url-shortener src/main.c)
